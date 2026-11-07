@@ -1,0 +1,207 @@
+#!/usr/bin/env sh
+
+usage() {
+    cat << EOF
+    Pi - Package Installer
+    Usage: $0 [OPTION]...
+    -n, --no-configure
+            Don't configure sources with configuration utility (./configure, meson, cmake)
+    -h, --help
+             Show this message
+    -r, --remove <package>
+            Remove package
+    -i, --install
+            Install package
+    -I, --install-pkg <package>.tar.gz
+            Install binary package (in development)
+    -u, --user
+            Package manager will don't touch system
+EOF
+}
+
+#
+# Variables
+#
+
+THREADS="$(nproc)"
+MODE=configure
+
+if [ -f "$HOME/.config/pi/pi.conf" ]; then
+    source $HOME/.config/pi/pi.conf
+    USERONLY=true
+else
+    if [ -f "/etc/pi/pi.conf" ]; then
+        source /etc/pi/pi.conf
+        USERONLY=false
+    elif [ -f "/usr/local/etc/pi/pi.conf" ]; then
+        source /usr/local/etc/pi/pi.conf
+        USERONLY=false
+    fi
+fi
+
+#
+# Functions Pt.1
+#
+
+get_pkg_name () {
+if [ "$(basename $PWD)" = 'build' ]; then
+    cd ..
+fi
+return=$(basename $PWD)
+}
+
+remove () {
+        cat $var/$pkg_name | xargs rm -v 2> /dev/null || echo "Pi: package not installed" && exit
+        rm $var/$pkg_name
+}
+
+
+#
+# Parse options
+#
+
+while [ $# -gt 0 ]; do
+    case $1 in
+        -u|--user)
+            USERONLY=true
+            echo "user-mode"
+            shift 1
+        ;;
+        -n|--no-configure)
+            MODE="make"
+            shift 1
+        ;;
+        -r|--remove)
+        if [ "$EUID" -ne 0 -a "$USERONLY" != 'true' ]; then
+            echo "Error: pi: It require root to continue"
+            exit
+        else
+            if [ -z "$2" ]; then
+                echo "Error: pi: expacted package name, but got nothing"
+                exit
+            else
+                pkg_name="$2"
+                remove
+                shift 2
+            fi
+        fi
+        ;;
+        -p|--prefix)
+            if [ -z "$2" ]; then
+                echo "Error: pi: expacted prefix, but got nothing"
+                exit
+            else
+                prefix="$2"
+                shift 2
+            fi
+        ;;
+        -i|--install)
+            if [ "$EUID" -ne 0 -a "$USERONLY" != 'true' ]; then
+               echo "Error: pi: It require root to continue"
+               exit
+           else
+               MODE="install"
+               shift 1
+           fi
+        ;;
+        -I|--install-pkg)
+            if [ -z "$2" ]; then
+                echo "Error: pi: expacted tarball file name, but got nothing"
+                exit
+            fi
+            package="$2"
+            if [ "$EUID" -ne 0 -a "$USERONLY" != 'true' ]; then
+               echo "Error: pi: It require root to continue"
+               exit
+            else
+                MODE="installpkg"
+                shift 1
+            fi
+        ;;
+        -h|--help)
+            usage
+            exit
+        ;;
+        *)
+        break
+    esac
+done
+
+# ========
+#  Functions pt. 2
+# ========
+
+pi-make () {
+    if [ -f ./Makefile ]; then
+        case $MODE in
+            make)
+                if command -v make >/dev/null; then
+                make -j$(nproc) || echo "Error: pi: compilation terminated." && exit
+                $MODE=install
+                else
+                    echo "Warning: pi: make not found"
+                fi
+            ;;
+            install)
+                if [ "$tmp_dir" = "" ]; then
+                    echo "Error: pi: variable 'tmp_dir' is empty!"
+                    exit
+                fi
+
+                get_pkg_name
+                local pkg_name="$return"
+                local path="$tmp_dir/$pkg_name"
+                make DESTDIR=$path install
+                if [ "$(basename $prefix)" = '.local' ]; then
+                cp -rfv "$path/usr/" "$prefix" | awk '{print $3}' > $var/$pkg_name
+                fi
+                rm -rf $tmp_dir/$pkg_name
+                exit
+            ;;
+        esac
+    elif [ -f ./build.ninja ]; then
+        ninja 2> /dev/null || samu 2> /dev/null || echo "Warning: pi: ninja or samurai not found"
+    elif [ -f ./Cargo.toml ]; then
+        # You can build rust packages only with cargo.
+        cargo --build --release || echo "Error: pi: cargo not found" && exit
+    elif [ -f ./BUILD.mek ]; then
+        mekanism base 2> /dev/null || echo "Warning: pi: mekanism not found"
+    # I'm not sure, that it's correct condition
+    elif [ -f ./CMakeCache.txt ]; then
+        cmake --build --parallel $(nproc) . 2> /dev/null || echo "Warning: pi: cmake not found"
+    else
+        echo "Error: pi: I don't know how to build"
+        exit
+    fi
+}
+
+pi-installpkg () {
+    echo "in development"
+    exit
+#    tar xpf "$pkg_name" -C $tmp_dir/$pkg_name
+#    cd $pkg_name
+#    if [ "$(ls)" = '$pkg_name' ]; then
+#    cd $pkg_name
+#    fi
+#    find > $var/$pkg_name
+#    install -m 755 * $prefix
+#    echo "Pi: package $pkg_name installed"
+ }
+
+#
+#  Parse modes
+#
+
+while [ "$MODE" != 'finish' ]; do
+    case $MODE in
+        make)
+            pi-make
+        ;;
+        install)
+            pi-make
+        ;;
+        installpkg)
+            echo "pi-installpkg"
+        ;;
+    esac
+done

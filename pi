@@ -26,7 +26,7 @@ EOF
 THREADS="$(nproc)"
 MODE=configure
 
-if [ -f "$HOME/.config/pi/pi.conf" ]; then
+if [ "USERONLY" = 'false' -a -f "$HOME/.config/pi/pi.conf" ]; then
     source $HOME/.config/pi/pi.conf
     USERONLY=true
 else
@@ -152,19 +152,70 @@ pi-make () {
                 local pkg_name="$return"
                 local path="$tmp_dir/$pkg_name"
                 make DESTDIR=$path install
-                if [ "$(basename $prefix)" = '.local' ]; then
-                cp -rfv "$path/usr/" "$prefix" | awk '{print $3}' > $var/$pkg_name
+                if [ "$prefix" = '$HOME/.local' -a "$(ls $path)" = 'usr' ]; then
+                    path="$path/usr"
+                    if [ "$(ls $path)" = 'local' ]; then
+                        path="$path/local"
+                    fi
                 fi
+                cp -arfv "$path"/* "$prefix" | awk '{print $3}' > $var/$pkg_name
                 rm -rf $tmp_dir/$pkg_name
                 exit
             ;;
         esac
     elif [ -f ./build.ninja ]; then
-        ninja 2> /dev/null || samu 2> /dev/null || echo "Warning: pi: ninja or samurai not found"
+        # TODO: rewrite this ==
+        if command -v ninja >/dev/null; then
+            if [ "$MODE" = 'make' ]; then
+                ninja -j$(nproc) || echo "Error: pi: compilation terminated." && exit
+                $MODE=install
+                else
+                get_pkg_name
+                local pkg_name="$return"
+                local path="$tmp_dir/$pkg_name"
+                DESTDIR="$path" ninja install
+
+                if [ "$prefix" = '$HOME/.local' -o "$(ls $path)" = 'usr' ]; then
+                    path="$path/usr"
+                    if [ "$(ls $path)" = 'local' ]; then
+                        path="$path/local"
+                    fi
+                fi
+                cp -arfv "$path"/* "$prefix" | awk '{print $3}' > $var/$pkg_name
+                rm -rf $tmp_dir/$pkg_name
+            fi
+        elif command -v samu > /dev/null; then
+            if [ "$MODE" = 'make' ]; then
+            samu -j$(nproc) || echo "Error: pi: compilation terminated." && exit
+            $MODE=install
+            else
+                get_pkg_name
+                local pkg_name="$return"
+                local path="$tmp_dir/$pkg_name"
+                DESTDIR="$path" ninja install
+
+                if [ "$prefix" = '$HOME/.local' -o "$(ls $path)" = 'usr' ]; then
+                    path="$path/usr"
+                    if [ "$(ls $path)" = 'local' ]; then
+                        path="$path/local"
+                    fi
+                fi
+                cp -arfv "$path"/* "$prefix" | awk '{print $3}' > $var/$pkg_name
+                rm -rf $tmp_dir/$pkg_name
+            fi
+        else
+             echo "Warning: pi: ninja or samurai not found"
+        fi
+        # ================
     elif [ -f ./Cargo.toml ]; then
         # You can build rust packages only with cargo.
         cargo --build --release || echo "Error: pi: cargo not found" && exit
     elif [ -f ./BUILD.mek ]; then
+        get_pkg_name
+        local pkg_name="$return"
+        if [ "$MODE" = 'install' ]; then
+            echo "Install by mekanism is not supported, install it yourself manually, and add paths to $var/$pkg_name"
+        fi
         mekanism base 2> /dev/null || echo "Warning: pi: mekanism not found"
     # I'm not sure, that it's correct condition
     elif [ -f ./CMakeCache.txt ]; then

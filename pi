@@ -14,6 +14,8 @@ usage() {
             Install package
     -I, --install-pkg <package>.tar.gz
             Install binary package (in development)
+    -m, --manually <package>
+            just copy files from /tmp/pi/<package>, to <prefix> and create <var>/<pkg_name> file
     -u, --user
             Package manager will don't touch system
 EOF
@@ -118,6 +120,20 @@ while [ $# -gt 0 ]; do
                 shift 1
             fi
         ;;
+        -m|--manually)
+            if [ -z "$2" ]; then
+                echo "Error: pi: expacted package, but got nothing"
+                exit
+            fi
+            package="$2"
+            if [ "$EUID" -ne 0 -a "$USERONLY" != 'true' ]; then
+                echo "Error: pi: It require root to continue"
+                exit
+            else
+                manually
+                shift 1
+            fi
+            ;;
         -h|--help)
             usage
             exit
@@ -130,6 +146,26 @@ done
 # ========
 #  Functions pt. 2
 # ========
+
+manually () {
+    local path=$tmp_dir/$pkg_name
+    if [ ! "$(ls $path | grep -e bin -e usr -e local -e share -e include -e etc) "]; then
+        echo "Warning: pi: Package doesn't respect file system, continue? (Y/n)"
+        read a
+        if [ "$a" != "Y" -o "$a" != "y" ]; then
+            exit
+        fi
+    fi
+    if [ "$prefix" = '$HOME/.local' -a "$(ls $path)" = 'usr' ]; then
+        path="$path/usr"
+        if [ "$(ls $path)" = 'local' ]; then
+            path="$path/local"
+        fi
+    fi
+    cp -arfv "$path"/* "$prefix" | awk '{print $3}' > $var/$pkg_name
+    rm -rf $tmp_dir/$pkg_name
+    exit
+}
 
 pi-make () {
     if [ -f ./Makefile ]; then

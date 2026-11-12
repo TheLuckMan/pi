@@ -26,7 +26,7 @@ EOF
 #
 
 THREADS="$(nproc)"
-MODE=configure
+MODE=make
 
 if [ "USERONLY" = 'false' -a -f "$HOME/.config/pi/pi.conf" ]; then
     source $HOME/.config/pi/pi.conf
@@ -83,7 +83,12 @@ while [ $# -gt 0 ]; do
                 exit
             else
                 pkg_name="$2"
-                remove
+                removeif [ "$prefix" = '$HOME/.local' -a "$(ls $path)" = 'usr' ]; then
+                        path="$path/usr"
+                        if [ "$(ls $path)" = 'local' ]; then
+                            path="$path/local"
+                        fi
+                    fi
                 shift 2
             fi
         fi
@@ -156,7 +161,11 @@ manually () {
             exit
         fi
     fi
-    if [ "$prefix" = '$HOME/.local' -a "$(ls $path)" = 'usr' ]; then
+    if [ "$prefix" = '$HOME/.local' -o "$(ls $path)" = 'usr' ]; then
+        path="$path/usr"
+        if [ "$(ls $path)" = 'local' ]; then
+            path="$path/local"
+    elif [ "$prefix" = '/usr' -a "$(ls $path)" = 'usr' ]; then
         path="$path/usr"
         if [ "$(ls $path)" = 'local' ]; then
             path="$path/local"
@@ -193,6 +202,11 @@ pi-make () {
                     if [ "$(ls $path)" = 'local' ]; then
                         path="$path/local"
                     fi
+                elif [ "$prefix" = '/usr' -a "$(ls $path)" = 'usr' ]; then
+                    path="$path/usr"
+                    if [ "$(ls $path)" = 'local' ]; then
+                        path="$path/local"
+                    fi
                 fi
                 cp -arfv "$path"/* "$prefix" | awk '{print $3}' > $var/$pkg_name
                 rm -rf $tmp_dir/$pkg_name
@@ -212,6 +226,10 @@ pi-make () {
                 DESTDIR="$path" ninja install
 
                 if [ "$prefix" = '$HOME/.local' -o "$(ls $path)" = 'usr' ]; then
+                    path="$path/usr"
+                    if [ "$(ls $path)" = 'local' ]; then
+                        path="$path/local"
+                elif [ "$prefix" = '/usr' -a "$(ls $path)" = 'usr' ]; then
                     path="$path/usr"
                     if [ "$(ls $path)" = 'local' ]; then
                         path="$path/local"

@@ -41,7 +41,7 @@ cd <program>
 pi
 ```
 
-It executes ``./configure`` with --prefix=/tmp/<program>, make -j$(nproc), make install, creates file <var>/pi/<package>
+It executes ``./configure`` with --prefix=/tmp/\<program\>, make -j$(nproc), make install, creates file \<var\>/pi/\<package\>
 which contains: size of program by executing ``du -sh <program>``, and ``/tmp/<program>``. And install the program
 
 if required to manually set options then do:
@@ -63,16 +63,16 @@ pi -r
 
 you can create binary tarballs for sharing
 ```sh 
-tar -cf  /tmp/<program>.tar /tmp/pi/<program>/*
-gzip -9 /tmp/<program>.tar
+tar -cf  /tmp/\<program\>.tar /tmp/pi/\<program\>/*
+gzip -9 /tmp/\<program\>.tar
 ```
-then will not create file in <var>, and will create /tmp/<package>.tar.gz
+then will not create file in \<var\>, and will create /tmp/\<package\>.tar.gz
 
 and for installing binaries by command
 ```sh
-pi --install-pkg <package>.tar.gz
+pi --install-pkg \<package\>.tar.gz
 # or 
-pi -I <package>.tar.gz
+pi -I \<package\>.tar.gz
 ```
 
 You can check all options of pi by typing

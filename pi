@@ -83,12 +83,7 @@ while [ $# -gt 0 ]; do
                 exit
             else
                 pkg_name="$2"
-                removeif [ "$prefix" = '$HOME/.local' -a "$(ls $path)" = 'usr' ]; then
-                        path="$path/usr"
-                        if [ "$(ls $path)" = 'local' ]; then
-                            path="$path/local"
-                        fi
-                    fi
+                remove
                 shift 2
             fi
         fi
@@ -165,6 +160,7 @@ manually () {
         path="$path/usr"
         if [ "$(ls $path)" = 'local' ]; then
             path="$path/local"
+        fi
     elif [ "$prefix" = '/usr' -a "$(ls $path)" = 'usr' ]; then
         path="$path/usr"
         if [ "$(ls $path)" = 'local' ]; then
@@ -229,6 +225,7 @@ pi-make () {
                     path="$path/usr"
                     if [ "$(ls $path)" = 'local' ]; then
                         path="$path/local"
+                    fi
                 elif [ "$prefix" = '/usr' -a "$(ls $path)" = 'usr' ]; then
                     path="$path/usr"
                     if [ "$(ls $path)" = 'local' ]; then
@@ -253,7 +250,12 @@ pi-make () {
                     if [ "$(ls $path)" = 'local' ]; then
                         path="$path/local"
                     fi
-                fi
+                    elif [ "$prefix" = '/usr' -a "$(ls $path)" = 'usr' ]; then
+                        path="$path/usr"
+                        if [ "$(ls $path)" = 'local' ]; then
+                            path="$path/local"
+                        fi
+                    fi
                 cp -arfv "$path"/* "$prefix" | awk '{print $3}' > $var/$pkg_name
                 rm -rf $tmp_dir/$pkg_name
             fi

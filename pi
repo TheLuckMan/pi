@@ -57,6 +57,30 @@ remove () {
         rm $var/$pkg_name
 }
 
+manually () {
+    local path=$tmp_dir/$pkg_name
+    if [ ! "$(ls $path | grep -e bin -e usr -e local -e share -e include -e etc) "]; then
+        echo "Warning: pi: Package doesn't respect file system, continue? (Y/n)"
+        read a
+        if [ "$a" != "Y" -o "$a" != "y" ]; then
+            exit
+        fi
+    fi
+    if [ "$prefix" = '$HOME/.local' -o "$(ls $path)" = 'usr' ]; then
+        path="$path/usr"
+        if [ "$(ls $path)" = 'local' ]; then
+            path="$path/local"
+        fi
+    elif [ "$prefix" = '/usr' -a "$(ls $path)" = 'usr' ]; then
+        path="$path/usr"
+        if [ "$(ls $path)" = 'local' ]; then
+            path="$path/local"
+        fi
+    fi
+    cp -arfv "$path"/* "$prefix" | awk '{print $3}' > $var/$pkg_name
+    rm -rf $tmp_dir/$pkg_name
+    exit
+}
 
 #
 # Parse options
@@ -147,31 +171,6 @@ done
 #  Functions pt. 2
 # ========
 
-manually () {
-    local path=$tmp_dir/$pkg_name
-    if [ ! "$(ls $path | grep -e bin -e usr -e local -e share -e include -e etc) "]; then
-        echo "Warning: pi: Package doesn't respect file system, continue? (Y/n)"
-        read a
-        if [ "$a" != "Y" -o "$a" != "y" ]; then
-            exit
-        fi
-    fi
-    if [ "$prefix" = '$HOME/.local' -o "$(ls $path)" = 'usr' ]; then
-        path="$path/usr"
-        if [ "$(ls $path)" = 'local' ]; then
-            path="$path/local"
-        fi
-    elif [ "$prefix" = '/usr' -a "$(ls $path)" = 'usr' ]; then
-        path="$path/usr"
-        if [ "$(ls $path)" = 'local' ]; then
-            path="$path/local"
-        fi
-    fi
-    cp -arfv "$path"/* "$prefix" | awk '{print $3}' > $var/$pkg_name
-    rm -rf $tmp_dir/$pkg_name
-    exit
-}
-
 pi-make () {
     if [ -f ./Makefile ]; then
         case $MODE in
@@ -215,7 +214,7 @@ pi-make () {
             if [ "$MODE" = 'make' ]; then
                 ninja -j$(nproc) || echo "Error: pi: compilation terminated." && exit
                 $MODE=install
-                else
+            else
                 get_pkg_name
                 local pkg_name="$return"
                 local path="$tmp_dir/$pkg_name"
@@ -237,8 +236,8 @@ pi-make () {
             fi
         elif command -v samu > /dev/null; then
             if [ "$MODE" = 'make' ]; then
-            samu -j$(nproc) || echo "Error: pi: compilation terminated." && exit
-            $MODE=install
+                samu -j$(nproc) || echo "Error: pi: compilation terminated." && exit
+                $MODE=install
             else
                 get_pkg_name
                 local pkg_name="$return"
